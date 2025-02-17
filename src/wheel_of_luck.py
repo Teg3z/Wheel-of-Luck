@@ -30,16 +30,15 @@ Dependencies:
 import sys
 import random
 import asyncio
-import threading
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QMenuBar, QMenu, QLineEdit, QFrame
 )
 from PyQt6.QtCore import Qt, QTimer
-import PySimpleGUI as sg
 
 from discord_bot import DiscordBot
 from db_handler import DbHandler
+from bot_thread import BotThread
 from utils import load_config, save_config
 
 # Colors
@@ -400,16 +399,6 @@ class SettingsWindow(QWidget):
         self.main_window.update_games_list()
 
         self.close()
-
-class BotThread(threading.Thread):
-    def __init__(self, bot: DiscordBot):
-        super().__init__(daemon=True)
-        self.bot = bot
-
-    def run(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.bot.run())
 
 async def main():
     """ Runs the PyQt application. """
