@@ -239,6 +239,7 @@ class MainWindow(QMainWindow):
         self.bot = bot
         self.bot_thread = bot_thread
         self.games = []
+        self.ask_message_id = None
         self.rolled_game = None
         self.previous_index = None
         self.current_index = 0
@@ -266,23 +267,27 @@ class MainWindow(QMainWindow):
         self.games_frame = QFrame()
         self.games_layout = QVBoxLayout(self.games_frame)
 
-        self.result_label = QLabel("")
-        self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.result_lbl = QLabel("")
+        self.result_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.spin_button = QPushButton("Spin")
-        self.spin_button.clicked.connect(self.start_spin_wheel)
+        self.ask_btn = QPushButton("Ask")
+        self.ask_btn.clicked.connect(self.ask)
+
+        self.spin_btn = QPushButton("Spin")
+        self.spin_btn.clicked.connect(self.start_spin_wheel)
+
+        self.announce_btn = QPushButton("Announce")
+        self.announce_btn.clicked.connect(self.announce_game)
 
         self.button_layout = QHBoxLayout()
-        self.announce_button = QPushButton("Announce")
-        self.announce_button.clicked.connect(self.announce_game)
-
-        self.button_layout.addWidget(self.spin_button)
-        self.button_layout.addWidget(self.announce_button)
+        self.button_layout.addWidget(self.ask_btn)
+        self.button_layout.addWidget(self.spin_btn)
+        self.button_layout.addWidget(self.announce_btn)
 
         # Add elements to the main layout
         self.main_layout.addWidget(menu_bar)
         self.main_layout.addWidget(self.games_frame)
-        self.main_layout.addWidget(self.result_label)
+        self.main_layout.addWidget(self.result_lbl)
         self.main_layout.addLayout(self.button_layout)
 
         # Load initial games
@@ -304,10 +309,20 @@ class MainWindow(QMainWindow):
         else:
             self.games_layout.addWidget(QLabel("Please connect to the database."))
 
+    def ask(self):
+        self.rolled_game = None
+        self.ask_message_id = asyncio.run_coroutine_threadsafe(
+            self.bot.send_message(
+                "Let's spin the wheel of luck! Who's in?"
+            ),
+            self.bot.client.loop
+        ).result()
+        print(f"Message ID: {self.ask_message_id}")
+
     def start_spin_wheel(self):
         """ Starts the spinning animation. """
         if not self.games:
-            self.result_label.setText("No games available!")
+            self.result_lbl.setText("No games available!")
             return
 
         # Whiten all games
@@ -344,7 +359,7 @@ class MainWindow(QMainWindow):
         if self.spin_speed > 300 and curr_game_label.text() == self.rolled_game:
             self.timer.stop()
             self.timer.timeout.disconnect()
-            self.result_label.setText(f"🎉 Enjoy {self.rolled_game}!")
+            self.result_lbl.setText(f"🎉 Enjoy {self.rolled_game}!")
         # Continue spinning
         else:
             self.spin_speed = self.spin_speed + self.slowdown_factor
