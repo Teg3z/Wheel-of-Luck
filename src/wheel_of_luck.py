@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QMenuBar, QMenu, QLineEdit, QFrame
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QEvent
 
 from discord_bot import DiscordBot
 from db_handler import DbHandler
@@ -227,11 +227,17 @@ font = ("Arial", 18)
     #     continue
 
 class MainWindow(QMainWindow):
-    def __init__(self, db: DbHandler, bot: DiscordBot) -> None:
+    def __init__(
+            self,
+            db: DbHandler,
+            bot: DiscordBot,
+            bot_thread: BotThread
+        ) -> None:
         super().__init__()
 
         self.db = db
         self.bot = bot
+        self.bot_thread = bot_thread
         self.games = []
         self.rolled_game = None
         self.previous_index = None
@@ -359,6 +365,23 @@ class MainWindow(QMainWindow):
         self.settings_window = SettingsWindow(self)
         self.settings_window.show()
 
+    def closeEvent(self, event: QEvent):
+        """
+        Handles application exit to properly shut down the Discord bot.
+        """
+        print("Closing application...")
+
+        if self.bot.client.loop.is_running():
+            print("Logging out the Discord bot...")
+            asyncio.run_coroutine_threadsafe(self.bot.logout(), self.bot.client.loop)
+        
+        print("Bot thread closing.")
+        # Ensure the bot thread properly exits
+        self.bot_thread.join()
+        print("Bot thread closed.")
+
+        event.accept()  # Allow the window to close
+
 class SettingsWindow(QWidget):
     def __init__(self, main_window: MainWindow) -> None:
         super().__init__()
@@ -414,10 +437,10 @@ async def main():
     bot_thread = BotThread(bot)
     bot_thread.start()
 
-    # Wait for the bot to be ready
+    # TODO Wait for the bot to be ready
     # await bot.wait_until_ready()
 
-    main_window = MainWindow(db, bot)
+    main_window = MainWindow(db, bot, bot_thread)
     main_window.show()
 
     sys.exit(app.exec())
