@@ -51,145 +51,6 @@ btn_size = (7, 0)
 # Fonts
 font = ("Arial", 18)
 
-# def change_last_spin_insertion_visibility(window: sg.Window, db: DbHandler, visible: bool):
-#     """
-#     Handles visibility of the corresponding UI elements taking care of last spin
-#     insertion into the DB. 
-
-#     Parameters:
-#         window (sg.Window):
-#             The main UI window of the application.
-#         db (pymongo.mongo_client.MongoClient):
-#             An instance of a MongoClient connected to the specified database.
-#         visible (bool):
-#             Indicates whether the UI elements should be hidden/shown .
-
-#     Returns:
-#         None
-#     """
-#     window["W"].Update(visible=visible)
-#     window["L"].Update(visible=visible)
-#     window["LAST_GAME"].Update(visible=visible)
-#     if visible:
-#         window["LAST_GAME"].Update(value=db.get_last_spin_string())
-
-#     window.refresh()
-
-# async def main_old() -> None:
-#     last_game_result_ui = None
-#     last_game_result = None
-#     is_last_spin_inserted = None
-#     # UI texts
-#     last_game_result_ui = sg.Text(
-#         f"\nLast game result? \n({last_game_result})",
-#         text_color=fg_color,
-#         background_color=bg_color,
-#         font=font,
-#         key="LAST_GAME",
-#         visible= not is_last_spin_inserted
-#     )
-#     result_ui = sg.Text("", text_color=fg_color, background_color=bg_color, font=font)
-#     win_lose_msg = sg.Text("", text_color=fg_color, background_color=bg_color, font=font)
-
-#     # Buttons
-#     win = sg.Button(
-#         "W",
-#         button_color=btn_color,
-#         font=font,
-#         mouseover_colors=btn_mouseover_color,
-#         size=btn_size,
-#         visible=not is_last_spin_inserted
-#     )
-#     lose = sg.Button(
-#         "L",
-#         button_color=btn_color,
-#         font=font,
-#         mouseover_colors=btn_mouseover_color,
-#         size=btn_size,
-#         visible=not is_last_spin_inserted
-#     )
-#     send_reaction_message_button = sg.Button(
-#         "SEND REACTION",
-#         button_color=btn_color,
-#         font=font,
-#         mouseover_colors=btn_mouseover_color,
-#         size=btn_size
-#     )
-
-#     # Layout creation
-#     layout = [
-#         [last_game_result_ui],
-#         [win, lose],
-#         [win_lose_msg]
-#     ]
-
-#     # Initiate variables
-#     rolled_game = None
-#     message_id = None
-
-    # # Pressing W/L buttons condition
-    # if event == "W":
-    #     win_lose_msg.update("\nYOU ARE THE BEST")
-    #     db.insert_log_into_database(event)
-    #     change_last_spin_insertion_visibility(main_window, db, visible=False)
-    #     continue
-    # if event == "L":
-    #     win_lose_msg.update("\nYOU SUCK")
-    #     db.insert_log_into_database(event)
-    #     change_last_spin_insertion_visibility(main_window, db, visible=False)
-    #     continue
-    # if event == "SEND REACTION":
-    #     rolled_game = None
-    #     message_id = await bot.send_message("Let's spin the wheel of luck! Who's in?")
-    #     continue
-    # if event == "PLAY REACTION":
-    #     # Check that there is a message already sent in the DC chat
-    #     if message_id is None:
-    #         print("You have to send a reaction message first.")
-    #         continue
-    #     players = await bot.get_reaction_users(message_id)
-
-    #     # No reaction case
-    #     if not players:
-    #         await bot.send_message("Nobody wants to participate :(")
-    #         continue
-
-    #     # Get list of games that those players have in common
-    #     is_first_player = True
-    #     for player in players:
-    #         # Inicialize the list of common games by the first player
-    #         if is_first_player:
-    #             common_games = db.get_list_of_user_games(player)
-    #             is_first_player = False
-    #             continue
-    #         # Get current players list of games
-    #         player_games = db.get_list_of_user_games(player)
-    #         # Keep only the games that are still in the common_games list
-    #         # and also in the current players list
-    #         updated_games_list = []
-    #         for game in common_games:
-    #             if game in player_games:
-    #                 updated_games_list.append(game)
-    #         common_games = updated_games_list
-
-    #     # Wheel setup and spinning
-    #     wanted_game_ui_texts, wanted_games = remove_unwated_games(
-    #         games_ui_texts,
-    #         games,
-    #         main_window,
-    #         common_games
-    #     )
-    #     rolled_game = await spin_wheel(
-    #         wanted_game_ui_texts,
-    #         wanted_games,
-    #         main_window,
-    #         result_ui
-    #     )
-    #     db.update_last_spin(rolled_game.Get(), players=players)
-    #     # Show insertion
-    #     change_last_spin_insertion_visibility(main_window, db, True)
-    #     continue
-
 class MainWindow(QMainWindow):
     def __init__(
             self,
@@ -251,14 +112,40 @@ class MainWindow(QMainWindow):
         self.button_layout.addWidget(self.spin_btn)
         self.button_layout.addWidget(self.announce_btn)
 
+        # --- Last spin panel ---
+        self.last_spin_lbl = QLabel("")
+        self.last_spin_lbl.setStyleSheet("color: white;")
+        self.last_spin_lbl.setVisible(True)
+
+        self.win_btn = QPushButton("W")
+        self.lose_btn = QPushButton("L")
+        self.win_btn.setVisible(False)
+        self.lose_btn.setVisible(False)
+
+        self.win_lose_msg = QLabel("")
+        self.win_lose_msg.setStyleSheet("color: white;")
+        self.win_lose_msg.setVisible(False)
+
+        self.win_btn.clicked.connect(lambda: self.on_spin_outcome("W"))
+        self.lose_btn.clicked.connect(lambda: self.on_spin_outcome("L"))
+
+        self.win_lose_button_layout = QHBoxLayout()
+        self.win_lose_button_layout.addWidget(self.win_btn)
+        self.win_lose_button_layout.addWidget(self.lose_btn)
+
         # Add elements to the main layout
         self.main_layout.addWidget(menu_bar)
         self.main_layout.addWidget(self.games_frame)
         self.main_layout.addWidget(self.result_lbl)
+        self.main_layout.addWidget(self.last_spin_lbl)
+        self.main_layout.addWidget(self.win_lose_msg)
         self.main_layout.addLayout(self.button_layout)
+        self.main_layout.addLayout(self.win_lose_button_layout)
 
         # Load initial games
         self.update_games_list()
+
+        self.set_last_spin_visibility(True)
 
     def update_games_list(self):
         """ Updates the games list dynamically based on database. """
@@ -297,6 +184,30 @@ class MainWindow(QMainWindow):
             self.bot.client.loop
         ).result()
         print(f"Message ID: {self.ask_message_id}")
+
+    def set_last_spin_visibility(self, visible: bool) -> None:
+        """ Show/hide the 'last spin' UI section. """
+        self.win_btn.setVisible(visible)
+        self.lose_btn.setVisible(visible)
+        self.last_spin_lbl.setVisible(visible)
+        if visible and self.db.is_connected:
+            self.last_spin_lbl.setText(f"Last game result?\n({self.db.get_last_spin_string()})")
+
+    def on_spin_outcome(self, outcome: str) -> None:
+        """User confirmed win/lose. Insert into DB and hide the W/L UI."""
+        try:
+            if self.db.is_connected:
+                self.db.insert_log_into_database(outcome)
+        except Exception as e:
+            print("Failed to insert outcome: ", e)
+
+        if outcome == "W":
+            self.win_lose_msg.setText("\nYOU ARE THE BEST")
+        else:
+            self.win_lose_msg.setText("\nYOU SUCK")
+        self.win_lose_msg.setVisible(True)
+
+        self.set_last_spin_visibility(False)
 
     def compute_common_games(self, players: list[str]) -> list[str]:
         """ Returns a list of common games for players in players list. """
@@ -362,6 +273,11 @@ class MainWindow(QMainWindow):
         if not self.visible_games:
             self.result_lbl.setText("No games to spin.")
             return
+        
+        # Hide last spin UI
+        self.result_lbl.setText("")
+        self.set_last_spin_visibility(False)
+        self.win_lose_msg.setVisible(False)
 
         self.rolled_game = random.choice(self.visible_games)
         self.previous_index = None
@@ -374,8 +290,6 @@ class MainWindow(QMainWindow):
         """ Spins the wheel by highlighting one game at a time. """
         if not self.games_layout:
             return
-        
-        self.result_lbl.setText("")
 
         # Reset previous selection to white
         if self.previous_index is not None:
@@ -399,13 +313,22 @@ class MainWindow(QMainWindow):
         self.previous_index = self.current_index
         self.current_index = (self.current_index + 1) % self.games_layout.count()
 
-        # Stop spinning and announce the winner
         if self.spin_speed > 300 and curr_game_label.text() == self.rolled_game:
+            # Stop spinning and announce the winner
             self.timer.stop()
             self.timer.timeout.disconnect()
             self.result_lbl.setText(f"🎉 Enjoy {self.rolled_game}!")
-        # Continue spinning
+
+            # Write the last spin (without outcome yet)
+            try:
+                if self.db.is_connected:
+                    self.db.update_last_spin(self.rolled_game, players=self.last_players)
+            except Exception as e:
+                print("Failed to update last spin: ", e)
+
+            self.set_last_spin_visibility(True)
         else:
+            # Continue spinning
             self.spin_speed = self.spin_speed + self.slowdown_factor
             self.timer.start(self.spin_speed)
 

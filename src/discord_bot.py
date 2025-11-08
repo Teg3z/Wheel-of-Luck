@@ -43,7 +43,7 @@ class DiscordBot:
 
         # Discord API needs the CHANNEL_ID in form of an integer, not string
         try:
-            self.text_channel_id = int(get_env_var_value("TEST_CHANNEL_ID"))
+            self.text_channel_id = int(get_env_var_value("CHANNEL_ID"))
         except (TypeError, ValueError):
             print("Invalid DISCORD_CHANNEL_ID. Must be an integer.")
             sys.exit(1)

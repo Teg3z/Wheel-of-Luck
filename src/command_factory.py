@@ -28,7 +28,7 @@ class CommandFactory:
             commands.RemoveGameCommand("!removegame", "Remove a game from the server's game list.", db),
             commands.MyGamesCommand("!mygames", "List all games of the user.", db),
             commands.AddUserGameCommand("!add", "Add a game to the user's game list.", db),
-            commands.RemoveUserGameCommand("!remove ", "Remove a game from the user's game list.", db),
+            commands.RemoveUserGameCommand("!remove", "Remove a game from the user's game list.", db),
         ]
         self.commands.append(commands.HelpCommand("!help", "List all available commands.", self.commands))
 
