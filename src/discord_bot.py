@@ -86,7 +86,7 @@ class DiscordBot:
         Returns:
             None
         """
-        print("Successfully logged out from Discord.")
+        print("Shutting down Discord bot...")
         await self.client.close()
 
     async def wait_until_ready(self) -> None:

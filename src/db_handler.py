@@ -42,7 +42,7 @@ class DbHandler(metaclass=Singleton):
     - get_list_of_games: Returns a list of all games in the database.
     - add_game_to_game_list: Adds a new game to the game list in the database.
     """
-    def __init__(self ,db_name='WheelOfLuck') -> None:
+    def __init__(self, db_name='WheelOfLuck') -> None:
         """
         Initializes the database connection and creates the necessary collections.
         

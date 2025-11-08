@@ -51,42 +51,6 @@ btn_size = (7, 0)
 # Fonts
 font = ("Arial", 18)
 
-# def remove_unwated_games(
-#         game_ui_texts: list[sg.Text],
-#         games: list[str],
-#         window: sg.Window,
-#         common_games: list[str]
-#     ) -> tuple[list[sg.Text], list[str]]:
-#     """
-#     Hides every game in the wheels UI that isn't mentioned in the `common_games` parameter.
-
-#     Parameters:
-#         games_ui_texts (sg.Text): UI texts of all the game names.
-#         games (list[Game]): A list of all games represented by Game objects.
-#         window (sg.Window): The main UI window of the application.
-#         common_games (list[string]): A list of game names that the players have in common.
-
-#     Returns:
-#         list[sg.Text]:
-#             Contains all UI texts of games that will be visible during the spin.
-#         list[Game]:
-#             Contains all the Game objects with the game names that the players have in common.
-#     """
-#     wanted_game_ui_texts = []
-#     wanted_games = []
-
-#     for index, game_ui_text in enumerate(game_ui_texts):
-#         if game_ui_text.key in common_games:
-#             window[game_ui_text.key].Update(visible = True)
-#             wanted_game_ui_texts.append(game_ui_text)
-#             # The lists games and game_ui_texts are in the same order, so indexing works
-#             wanted_games.append(games[index])
-#         else:
-#             window[game_ui_text.key].Update(visible = False)
-
-#     window.refresh()
-#     return wanted_game_ui_texts, wanted_games
-
 # def change_last_spin_insertion_visibility(window: sg.Window, db: DbHandler, visible: bool):
 #     """
 #     Handles visibility of the corresponding UI elements taking care of last spin
@@ -239,6 +203,9 @@ class MainWindow(QMainWindow):
         self.bot = bot
         self.bot_thread = bot_thread
         self.games = []
+        self.game_labels: dict[str, QLabel] = {}
+        self.visible_games: list[str] = []
+        self.last_players: list[str] = []
         self.ask_message_id = None
         self.rolled_game = None
         self.previous_index = None
@@ -301,16 +268,28 @@ class MainWindow(QMainWindow):
             if widget:
                 widget.deleteLater()
 
+        self.game_labels.clear()
+        self.visible_games.clear()
+
         if self.db.is_connected:
             self.games = self.db.get_list_of_games()
             for game in self.games:
                 game_label = QLabel(game)
+                game_label.setStyleSheet("color: white;")
                 self.games_layout.addWidget(game_label)
+                self.game_labels[game] = game_label
+            self.visible_games = list(self.games)
         else:
             self.games_layout.addWidget(QLabel("Please connect to the database."))
 
     def ask(self):
         self.rolled_game = None
+
+        for _, label in self.game_labels.items():
+            label.setVisible(True)
+            label.setStyleSheet("color: white;")
+        self.visible_games = list(self.games)
+
         self.ask_message_id = asyncio.run_coroutine_threadsafe(
             self.bot.send_message(
                 "Let's spin the wheel of luck! Who's in?"
@@ -319,18 +298,72 @@ class MainWindow(QMainWindow):
         ).result()
         print(f"Message ID: {self.ask_message_id}")
 
+    def compute_common_games(self, players: list[str]) -> list[str]:
+        """ Returns a list of common games for players in players list. """
+        if not players:
+            return []
+
+        common = set(self.db.get_list_of_user_games(players[0]))
+        for name in players[1:]:
+            games = set(self.db.get_list_of_user_games(name))
+            # Keep only the games that are in both sets
+            common &= games
+            if not common:
+                break
+        # Common games must be only available games 
+        common &= set(self.games)
+        return sorted(common)
+    
+    def filter_ui_by_common_games(self, common_games: list[str]) -> None:
+        """ Skryje všechny hry mimo common_games a nastaví visible_games jen na ty společné. """
+        if not common_games:
+            return
+
+        common_set = set(common_games)
+        for game, label in self.game_labels.items():
+            label.setVisible(game in common_set)
+
+        self.visible_games = list(common_games)
+
     def start_spin_wheel(self):
         """ Starts the spinning animation. """
+        # Check if there are any games to spin
         if not self.games:
             self.result_lbl.setText("No games available!")
             return
+        
+        # Get players that reacted to the ask message
+        players = []
+        if self.ask_message_id is not None:
+            try:
+                players = asyncio.run_coroutine_threadsafe(
+                    self.bot.get_reaction_users(self.ask_message_id),
+                    self.bot.client.loop
+                ).result()
+            except Exception as e:
+                print("Failed to read reaction users:", e)
+
+        if players:
+            common_games = self.compute_common_games(players)
+            if not common_games:
+                self.result_lbl.setText("No common games found for the current participants.")
+                return
+            self.filter_ui_by_common_games(common_games)
+            self.last_players = players
+        else:
+            self.visible_games = list(self.games)
+            self.last_players = []
 
         # Whiten all games
         for i in range(self.games_layout.count()):
             label: QLabel = self.games_layout.itemAt(i).widget()
             label.setStyleSheet("color: white;")
 
-        self.rolled_game = random.choice(self.games)
+        if not self.visible_games:
+            self.result_lbl.setText("No games to spin.")
+            return
+
+        self.rolled_game = random.choice(self.visible_games)
         self.previous_index = None
         self.current_index = 0
         self.spin_speed = 10
@@ -341,11 +374,22 @@ class MainWindow(QMainWindow):
         """ Spins the wheel by highlighting one game at a time. """
         if not self.games_layout:
             return
+        
+        self.result_lbl.setText("")
 
         # Reset previous selection to white
         if self.previous_index is not None:
-            curr_game_label: QLabel = self.games_layout.itemAt(self.previous_index).widget()
-            curr_game_label.setStyleSheet("color: white;")
+            prev_label: QLabel = self.games_layout.itemAt(self.previous_index).widget()
+            if prev_label:
+                prev_label.setStyleSheet("color: white;")
+
+        tries = 0
+        while tries < self.games_layout.count():
+            curr_label: QLabel = self.games_layout.itemAt(self.current_index).widget()
+            if curr_label.isVisible():
+                break
+            self.current_index = (self.current_index + 1) % self.games_layout.count()
+            tries += 1
 
         # Highlight the current game in green
         curr_game_label = self.games_layout.itemAt(self.current_index).widget()
@@ -368,12 +412,10 @@ class MainWindow(QMainWindow):
     def announce_game(self):
         """ Announces the rolled game via the Discord bot. """
         if self.rolled_game:
-            asyncio.run_coroutine_threadsafe(
-                self.bot.send_message(
-                    f"Going to play {self.rolled_game}, anyone wanna join in?"
-                ),
-                self.bot.client.loop
-            )
+            text = f"Going to play {self.rolled_game}, anyone wanna join in?"
+            if self.last_players:
+                text = f"Going to play {self.rolled_game} with {', '.join(self.last_players)}. Anyone else?"
+            asyncio.run_coroutine_threadsafe(self.bot.send_message(text), self.bot.client.loop)
 
     def open_settings(self):
         """ Opens the settings window. """
